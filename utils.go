@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/src-d/enry.v1/data"
 )
 
 var (
@@ -31,25 +33,47 @@ func IsAuxiliaryLanguage(lang string) bool {
 
 // IsConfiguration returns whether or not path is using a configuration language.
 func IsConfiguration(path string) bool {
-	lang, _ := GetLanguageByExtension(path)
-	_, is := configurationLanguages[lang]
-
+	language, _ := GetLanguageByExtension(path)
+	_, is := configurationLanguages[language]
 	return is
 }
 
 // IsDotFile returns whether or not path has dot as a prefix.
 func IsDotFile(path string) bool {
-	return strings.HasPrefix(filepath.Base(path), ".")
+	path = filepath.Clean(path)
+	base := filepath.Base(path)
+	return strings.HasPrefix(base, ".") && base != "." && base != ".."
 }
 
 // IsVendor returns whether or not path is a vendor path.
 func IsVendor(path string) bool {
-	return vendorMatchers.Match(path)
+	return data.VendorMatchers.Match(path)
 }
 
 // IsDocumentation returns whether or not path is a documentation path.
 func IsDocumentation(path string) bool {
-	return documentationMatchers.Match(path)
+	return data.DocumentationMatchers.Match(path)
+}
+
+func IsImage(path string) bool {
+	extension := filepath.Ext(path)
+	if extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".gif" {
+		return true
+	}
+
+	return false
+}
+
+func GetMimeType(path string, language string) string {
+	if mime, ok := data.LanguagesMime[language]; ok {
+		return mime
+	}
+
+	if IsImage(path) {
+		return "image/" + filepath.Ext(path)[1:]
+	}
+
+	return "text/plain"
 }
 
 const sniffLen = 8000
@@ -67,3 +91,17 @@ func IsBinary(data []byte) bool {
 
 	return true
 }
+
+// FileCount type stores language name and count of files belonging to the
+// language.
+type FileCount struct {
+	Name  string
+	Count int
+}
+
+// FileCountList type is a list of FileCounts.
+type FileCountList []FileCount
+
+func (fcl FileCountList) Len() int           { return len(fcl) }
+func (fcl FileCountList) Less(i, j int) bool { return fcl[i].Count < fcl[j].Count }
+func (fcl FileCountList) Swap(i, j int)      { fcl[i], fcl[j] = fcl[j], fcl[i] }

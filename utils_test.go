@@ -3,12 +3,13 @@ package enry
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func (s *SimpleLinguistTestSuite) TestIsVendor() {
+func (s *EnryTestSuite) TestIsVendor() {
 	tests := []struct {
 		name     string
 		path     string
@@ -31,7 +32,7 @@ func (s *SimpleLinguistTestSuite) TestIsVendor() {
 	}
 }
 
-func (s *SimpleLinguistTestSuite) TestIsDocumentation() {
+func (s *EnryTestSuite) TestIsDocumentation() {
 	tests := []struct {
 		name     string
 		path     string
@@ -47,7 +48,7 @@ func (s *SimpleLinguistTestSuite) TestIsDocumentation() {
 	}
 }
 
-func (s *SimpleLinguistTestSuite) TestIsConfiguration() {
+func (s *EnryTestSuite) TestIsConfiguration() {
 	tests := []struct {
 		name     string
 		path     string
@@ -55,7 +56,7 @@ func (s *SimpleLinguistTestSuite) TestIsConfiguration() {
 	}{
 		{name: "TestIsConfiguration_1", path: "foo", expected: false},
 		{name: "TestIsConfiguration_2", path: "foo.ini", expected: true},
-		{name: "TestIsConfiguration_3", path: "foo.json", expected: true},
+		{name: "TestIsConfiguration_3", path: "/test/path/foo.json", expected: true},
 	}
 
 	for _, test := range tests {
@@ -64,7 +65,7 @@ func (s *SimpleLinguistTestSuite) TestIsConfiguration() {
 	}
 }
 
-func (s *SimpleLinguistTestSuite) TestIsBinary() {
+func (s *EnryTestSuite) TestIsBinary() {
 	tests := []struct {
 		name     string
 		data     []byte
@@ -81,19 +82,58 @@ func (s *SimpleLinguistTestSuite) TestIsBinary() {
 	}
 }
 
-const (
-	htmlPath = "some/random/dir/file.html"
-	jsPath   = "some/random/dir/file.js"
-)
+func (s *EnryTestSuite) TestIsDotFile() {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{name: "TestIsDotFile_1", path: "foo/bar/./", expected: false},
+		{name: "TestIsDotFile_2", path: "./", expected: false},
+	}
 
-func BenchmarkVendor(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = IsVendor(htmlPath)
+	for _, test := range tests {
+		is := IsDotFile(test.path)
+		assert.Equal(s.T(), test.expected, is, fmt.Sprintf("%v: is = %v, expected: %v", test.name, is, test.expected))
 	}
 }
 
-func BenchmarkVendorJS(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = IsVendor(jsPath)
+func TestFileCountListSort(t *testing.T) {
+	sampleData := FileCountList{{"a", 8}, {"b", 65}, {"c", 20}, {"d", 90}}
+	const ascending = "ASC"
+	const descending = "DESC"
+
+	tests := []struct {
+		name         string
+		data         FileCountList
+		order        string
+		expectedData FileCountList
+	}{
+		{
+			name:         "ascending order",
+			data:         sampleData,
+			order:        ascending,
+			expectedData: FileCountList{{"a", 8}, {"c", 20}, {"b", 65}, {"d", 90}},
+		},
+		{
+			name:         "descending order",
+			data:         sampleData,
+			order:        descending,
+			expectedData: FileCountList{{"d", 90}, {"b", 65}, {"c", 20}, {"a", 8}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.order == descending {
+				sort.Sort(sort.Reverse(test.data))
+			} else {
+				sort.Sort(test.data)
+			}
+
+			for i := 0; i < len(test.data); i++ {
+				assert.Equal(t, test.data[i], test.expectedData[i], fmt.Sprintf("%v: FileCount at position %d = %v, expected: %v", test.name, i, test.data[i], test.expectedData[i]))
+			}
+		})
 	}
 }
